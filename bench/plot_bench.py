@@ -18,7 +18,8 @@ CSV = sys.argv[1] if len(sys.argv) > 1 else "bench_results.csv"
 df = pd.read_csv(CSV)
 
 NUMQ_P1 = 8
-THEORY = (5.0 / 6.0) * NUMQ_P1
+# exact closed form at d=2, not just the (5/6)n leading term (Walzer & Williams, ESA 2025)
+THEORY = (5.0 / 6.0) * NUMQ_P1 - 1.0 + 1.0 / (6.0 * NUMQ_P1)
 
 BLUE, GREEN, RED, ORANGE, PURPLE = "#4C72B0", "#55A868", "#C44E52", "#DD8452", "#8172B3"
 
@@ -30,7 +31,7 @@ def fig_part1():
     fig, ax = plt.subplots(figsize=(5.2, 3.4))
     bars = ax.bar(order, means, color=[BLUE, GREEN, RED])
     ax.axhline(THEORY, ls="--", color="black", lw=1.2,
-               label=f"uniform-load theory (5/6)·n = {THEORY:.2f}")
+               label=f"uniform-load theory (5/6)n−1+1/(6n) = {THEORY:.2f}")
     for b, m in zip(bars, means):
         ax.text(b.get_x() + b.get_width() / 2, m, f"{m:.1f}", ha="center", va="bottom", fontsize=9)
     ax.set_ylabel("mean rank error")
