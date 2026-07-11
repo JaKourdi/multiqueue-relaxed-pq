@@ -109,7 +109,7 @@ What I care about is that all of the quality analysis assumes a uniformly random
 at what happens when the small elements pile up in a few queues, and that is the case my project looks at.</p>
 
 <h2>3. My Approach and Method</h2>
-<p>I wrote the MultiQueue and the whole test harness in <span class="kw">pure Java 8</span> (one directory, no
+<p>I wrote the MultiQueue and the whole test harness in <span class="kw">Java 8</span> (one directory, no
 packages, main class <span class="mono">MppRunner</span>, no JVM flags) so it builds and runs unchanged on the
 college server. Each internal queue is a <span class="mono">long</span>-based binary min-heap behind a
 <span class="mono">ReentrantLock</span>, with a <span class="mono">volatile</span> cached minimum and some manual
@@ -118,7 +118,7 @@ comes from <span class="mono">ThreadLocalRandom</span>.</p>
 <p>Rank error is <span class="kw">ordinal</span>: it counts how many elements currently in the queue are smaller
 than the one I returned, no matter what the actual key values are. That means it depends on how the small elements
 are spread across the queues, which is what drove my choice of workloads. I use three.
-<span class="kw">UNIFORM</span> has i.i.d. keys and uniform placement, which is the regime the analysis assumes.
+<span class="kw">UNIFORM</span> has independent, identically distributed keys and uniform placement, which is the regime the analysis assumes.
 <span class="kw">MONOTONE</span> is Dijkstra-like: each insert is just above the producer’s last deletion, so it
 stresses key <em>order</em> only while placement stays uniform. <span class="kw">SKEWED</span> routes the small
 keys to a small “hot” subset of queues, which models urgent work coming from a few sources. Quality is measured
@@ -210,7 +210,7 @@ raises the chance the biased probe hits the hot set, which is only <span class="
 of 16 here). That gives about a 61–64% reduction in the mean (37.8→14.7 for the <span class="mono">M=4, ε=⅛</span>
 ring, and 13.7 for a single slot) and about an 8× smaller tail (p99 615→80), which is several times better than
 STALE. The gain also survives interleaved <span class="mono">p=8</span> execution (Fig. 3 right, 29.2→14.3). I also
-ran two sanity checks. Raising <span class="mono">d</span> to 3 beats WINNER on pure quality
+ran two sanity checks. Raising <span class="mono">d</span> to 3 beats WINNER on quality alone
 (6.4 vs 13.7), but it samples an extra queue on every operation, whereas WINNER gets about ¾ of that gain for free
 at <span class="mono">d=2</span>. And on UNIFORM load WINNER makes no difference, because there is no persistent
 hot queue to remember.</p>

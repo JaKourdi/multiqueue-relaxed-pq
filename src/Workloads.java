@@ -5,7 +5,7 @@ import java.util.concurrent.ThreadLocalRandom;
 // (Williams, Sanders, ESA 2021) -- UNIFORM is exactly that regime. MONOTONE only messes
 // with key order, placement's still uniform. SKEWED breaks the placement half of it.
 public enum Workloads {
-    // i.i.d. uniform keys, uniform-random placement -- the regime the analysis assumes.
+    // independent, identically distributed uniform keys, uniform-random placement (analysis regime).
     UNIFORM,
 
     // Dijkstra-like: each insert is slightly larger than this producer's last deletion.
