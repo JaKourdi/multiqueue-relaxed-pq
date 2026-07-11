@@ -66,7 +66,9 @@ python3 bench/plot_bench.py bench/bench_results.csv
 
 ## Results at a glance
 
-All numbers are from real runs of the Java 8 code; rank error is measured exactly (a single-threaded driver mirroring the live queue in a Fenwick multiset, since the analyses are stated for sequential execution), averaged over repeats.
+All numbers are from real runs of the Java 8 code; rank error is measured exactly (a single-threaded driver mirroring the live queue in a Fenwick tree / binary indexed tree [6], since the analyses are stated for sequential execution), averaged over repeats.
+
+**Why a Fenwick tree.** Each `deleteMin` asks one question: *of the keys still in the queue, how many are smaller than the one I just removed?* That is a running total (a prefix sum) over the key range. If I kept the counts in a plain array I would have to add up a whole slice of it for every query, and I ask this question hundreds of thousands of times per run. A Fenwick tree stores those partial sums so that both "one more key is present" and "count everything below `k`" take about `log(U)` steps — roughly 20 for our universe of `2^20` — instead of walking the whole range. That is what keeps the exact rank-error sweep fast enough to run every configuration many times over.
 
 | Part | Measurement | Result |
 |------|-------------|--------|
@@ -89,3 +91,4 @@ The full write-up (abstract, paper summaries, method, all three parts, and the r
 3. S. Walzer, M. Williams. *A Simple yet Exact Analysis of the MultiQueue.* ESA 2025, LIPIcs. doi:10.4230/LIPIcs.ESA.2025.85. Preprint: arXiv:2410.08714.
 4. M. Mitzenmacher, B. Prabhakar, D. Shah. *Load Balancing with Memory.* IEEE FOCS 2002, pp. 799–808. (The "power of two choices with memory"; used here as motivation, not as a bound, since a deletion priority queue is not the static balls-into-bins setting it analyses.)
 5. V. Gramoli. *More Than You Ever Wanted to Know about Synchronization (Synchrobench).* PPoPP 2015. Benchmarking methodology for concurrent data structures.
+6. Fenwick tree (binary indexed tree). CP-Algorithms. https://cp-algorithms.com/data_structures/fenwick.html. Used only in the measurement driver, not in the MultiQueue itself, to make the exact prefix-count rank query `O(log U)`.

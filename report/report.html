@@ -123,8 +123,12 @@ are spread across the queues, which is what drove my choice of workloads. I use 
 stresses key <em>order</em> only while placement stays uniform. <span class="kw">SKEWED</span> routes the small
 keys to a small “hot” subset of queues, which models urgent work coming from a few sources. Quality is measured
 with a single-threaded driver, since the analyses are stated for sequential execution of the operations [3]. The
-driver runs the real MultiQueue and mirrors its contents in a Fenwick tree, so every
-<span class="mono">deleteMin</span>’s rank error is exact; I average over seven repetitions. To make sure the
+driver runs the real MultiQueue and mirrors its contents in a Fenwick tree (a binary indexed
+tree [6]), so every <span class="mono">deleteMin</span>’s rank error is exact; I average over seven repetitions.
+Each rank error is one question — of the keys still present, how many are smaller than the one just deleted — which is a
+running total over the key range. A plain count array would make me add up a whole slice per query, and I ask this
+hundreds of thousands of times per run; the Fenwick tree keeps both “one key added” and “count everything below
+<span class="mono">k</span>” at about <span class="mono">log U</span> steps (~20 for our <span class="mono">2<sup>20</sup></span> universe), so the exact sweep stays fast enough to repeat over every configuration. To make sure the
 result is not just a sequential artefact, I also measure exact rank error with <span class="mono">p</span> threads
 issuing operations in interleaved order, applying each one under an audit monitor so the count stays exact while
 the per-thread memory and the shared queue still interact. Throughput is a separate experiment: all
@@ -270,6 +274,7 @@ workload-adaptive sampling that the analysis leaves open.</p>
 <li>S. Walzer, M. Williams. <em>A Simple yet Exact Analysis of the MultiQueue.</em> ESA 2025, LIPIcs. doi:10.4230/LIPIcs.ESA.2025.85. Preprint: arXiv:2410.08714.</li>
 <li>M. Mitzenmacher, B. Prabhakar, D. Shah. <em>Load Balancing with Memory.</em> IEEE FOCS 2002, pp. 799–808. (The “power of two choices with memory”; used here as motivation, not as a bound — a deletion priority queue is not the static balls-into-bins setting it analyses.)</li>
 <li>V. Gramoli. <em>More Than You Ever Wanted to Know about Synchronization (Synchrobench).</em> PPoPP 2015 — benchmarking methodology for concurrent data structures.</li>
+<li>Fenwick tree (binary indexed tree). CP-Algorithms. <span class="mono">https://cp-algorithms.com/data_structures/fenwick.html</span>. Used only in the measurement driver, not in the MultiQueue itself, to make the exact prefix-count rank query <span class="mono">O(log U)</span>.</li>
 </ol>
 
 </body>
