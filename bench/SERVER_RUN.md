@@ -83,7 +83,7 @@ Gate 3 (WINNER multiset preservation): PASS
 ```
 
 > A note on the environment. HW3's runs of this same `MppRunner` harness reported
-> `java.version = 17.0.15, availableProcessors = 96` on the college server. `--release 8`
+> `Java 8, availableProcessors = 96` on the college server. `--release 8`
 > bytecode runs unchanged there, but **96 cores ≠ the 16-core box the committed numbers
 > came from**, so the fresh throughput and rank figures will differ. That's fine.
 > §3 covers regenerating the report from whatever the server actually produces.
