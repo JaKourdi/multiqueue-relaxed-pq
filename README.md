@@ -76,7 +76,7 @@ All numbers are from real runs of the Java 8 code; rank error is measured exactl
 | **2 — variation** | SKEWED mean rank error, `p=8`, `n=16` | `d=1` **1756.5** → `d=2` **35.6** → `d=4` **4.2** → `d=8` **1.7**; throughput ~**28%** lower from `d=2` to `d=8` |
 | **3 — improvement** | SKEWED mean rank error, `d=2`, `n=16` (baseline UNIFORM **37.78**) | STALE **30.92** (~18%) · WINNER `M=1` **13.71** · WINNER `M=4, ε=⅛` **14.74** — about **61%** off the mean, tail `p99` **615→80** (~8×) |
 | | robustness | WINNER holds under `p=8` interleaved execution (**29.2→14.3**) and does not herd: throughput ~**14 M ops/s** vs UNIFORM **13.6 M** / STALE **13.9 M**, and a *shared* tracker collapses throughput **14.2→3.6 M ops/s** (~4×) |
-| **scalability** | throughput vs thread count | StrictPQ peaks at **22.3 M ops/s** (1 thread), flattens to ~**13 M**; MultiQueue starts at **15.4 M**, overtakes by 8 threads, reaches **54.1 M ops/s** at 64 threads (~4× the strict queue) |
+| **scalability** | throughput vs thread count | StrictPQ peaks at **22.3 M ops/s** (1 thread), flattens to ~**13 M**; MultiQueue starts at **15.4 M** (dips to **7.6 M** at 2 threads), overtakes by 8 threads, reaches **54.1 M ops/s** at 64 threads (~4× the strict queue) |
 
 So the `(5/6)·n` guarantee is real but conditional on uniform load. The `d` parameter trades throughput for quality, with a knee at `d=2`. And a strictly thread-local, content-aware bias (WINNER) recovers most of the lost quality under skew without the coordination cost that would otherwise eat the gain.
 
