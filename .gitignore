@@ -3,6 +3,9 @@ out/
 *.class
 !artifacts/server_upload/*.class
 
+# Report source (only the rendered PDF is shared)
+report/report.html
+
 # Transient local run output at the repo root (the curated copies live in artifacts/)
 /mpp.out
 /mpp.err

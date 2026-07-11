@@ -31,7 +31,7 @@ python3 bench/plot_bench.py bench/bench_results.csv
 
 ```
 src/           Java 8 sources, no packages, main class MppRunner
-report/        report.pdf (the write-up) and report.html (its source)
+report/        report.pdf (the write-up)
 bench/         SERVER_RUN.md, the averaging and plotting scripts, CSV, figures/, raw run captures
 artifacts/     compiled .class set for the server, plus reference run captures
 ```
