@@ -191,7 +191,7 @@ public class MppRunner {
                     rankErrorSeq(numQueues, dd, MultiQueue.SampleStrategy.UNIFORM, MultiQueue.NEVER_SYNC, 0, Workloads.SKEWED));
         }
 
-        // (b) exploration sweep, the quality/contention dial Moshe asked about comparing.
+        // (b) exploration sweep, the quality/contention dial (the "compare the options" part).
         // WINNER (M=4), varying the forced-exploration period: greedy (never), 1/16, 1/8, 1/4.
         // quality measured sequentially; throughput + lock-fail rate measured concurrently.
         System.err.println("--- part3eps: WINNER exploration dial on SKEWED ---");
