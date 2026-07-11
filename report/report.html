@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Relaxing the Priority Queue: A MultiQueue Study</title>
+<style>
+  @page { size: A4; margin: 12mm 16mm; }
+  html { font-family: Arial, Calibri, "Helvetica Neue", sans-serif; font-size: 9.5pt; color: #111; line-height: 1.28; }
+  body { margin: 0; }
+  h1 { font-size: 14pt; margin: 0 0 2pt 0; }
+  h2 { font-size: 11pt; margin: 9pt 0 3pt 0; border-bottom: 1px solid #bbb; padding-bottom: 2pt; }
+  h3 { font-size: 10pt; margin: 7pt 0 2pt 0; }
+  .sub { color: #444; font-size: 9.7pt; margin: 0 0 2pt 0; }
+  .authors { color: #444; font-size: 9.2pt; margin: 0 0 9pt 0; }
+  p { margin: 3pt 0; text-align: justify; }
+  code, .mono { font-family: Consolas, "Courier New", monospace; font-size: 9.2pt; }
+  .abstract { background: #f4f6f9; border: 1px solid #d8dee8; padding: 7pt 10pt; border-radius: 4px; }
+  .env { background: #fbf7ee; border: 1px solid #e6ddc6; padding: 4pt 8pt; border-radius: 4px; font-size: 8.9pt; margin: 5pt 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 5pt 0; }
+  th, td { border: 1px solid #c4ccd6; padding: 2.5pt 6pt; text-align: center; }
+  th { background: #eef1f5; }
+  td.l, th.l { text-align: left; }
+  figure { margin: 4pt 0; text-align: center; page-break-inside: avoid; }
+  figure img { width: 48%; max-width: 48%; }
+  figure.wide img { width: 72%; max-width: 72%; }
+  figcaption { font-size: 8.6pt; color: #444; margin-top: 2pt; text-align: left; }
+  .refs { font-size: 9.1pt; }
+  .refs li { margin: 3pt 0; }
+  .note { font-size: 8.9pt; color: #444; }
+  ul { margin: 4pt 0; padding-left: 18pt; }
+  li { margin: 2pt 0; }
+  .kw { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>Relaxing the Priority Queue: A Study of the MultiQueue Under Non-Uniform Load</h1>
+<p class="sub">Multicore Programming — Final Project. Topic: weakening the concurrent priority queue (MultiQueue).</p>
+<p class="authors">Submitted by: Yacov Kourdi (ID 311400238). Papers summarized: Rihani–Sanders–Dementiev (SPAA 2015) [1]; Williams–Sanders–Dementiev (ESA 2021) [2]; Walzer–Williams (ESA 2025) [3].</p>
+
+<div class="abstract">
+<p><span class="kw">Abstract.</span> A concurrent priority queue has a contention bottleneck at
+<span class="mono">deleteMin</span>: every thread wants the single smallest element, so the operation that
+returns it has to be serialized. The <span class="kw">MultiQueue</span> gets around this by relaxing correctness.
+It keeps <span class="mono">c·p</span> internal queues, inserts into a random one, and lets
+<span class="mono">deleteMin</span> return the smaller minimum of only <span class="mono">d</span> randomly
+sampled queues. Its quality guarantee, an expected <span class="kw">rank error</span> of
+<span class="mono">(5/6)·n − 1 + 1/(6n)</span> at <span class="mono">d=2</span>, assumes the load is uniformly
+random. I summarize the three papers that build this structure and then carry out the three-part project I had
+approved. (1) <em>Problem</em>: under a non-uniform placement workload the measured rank error is about 4× the
+bound (27.6 vs 6.67 at <span class="mono">n=8</span>). (2) <em>Variation</em>: sweeping <span class="mono">d</span>
+makes rank error fall sharply (from 1756 at <span class="mono">d=1</span> to 1.7 at <span class="mono">d=8</span>),
+while throughput drops about 28% over the useful <span class="mono">d=2–8</span> range. (3) <em>Improvement</em>:
+the idea I chose to start from (bias toward the least-recently-sampled queue) helps only about 18%, so after
+investigating I improved it into <span class="kw">remember-the-winner</span>, a thread-local bias toward recently winning queues that cuts SKEWED
+rank error by about 60% with no shared writes and no herding. Every number here comes from real runs of my
+Java 8 code, with sequential rank error measured exactly so it matches the setting the analyses use.</p>
+</div>
+
+<h2>1. Introduction — the shared problem</h2>
+<p>A <span class="kw">strict</span> concurrent priority queue always returns the true minimum. Because every
+thread contends for that one element, the operation serializes and throughput stops scaling; my
+<span class="mono">StrictPQ</span> baseline (one heap, one lock) shows exactly this in §4.4. All three papers I
+summarize attack the problem the same way: <span class="kw">relax</span> the semantics and return an element that
+is only <em>approximately</em> minimal, and get parallelism in return.</p>
+<p>The shared design is the <span class="kw">MultiQueue</span>. It keeps <span class="mono">n = c·p</span> internal
+sequential heaps (<span class="mono">c</span> a small queue-factor, <span class="mono">p</span> the thread count),
+each with its own lock. <span class="mono">insert</span> picks a uniform-random queue, and
+<span class="mono">deleteMin</span> samples <span class="mono">d</span> queues (the “power of <span class="mono">d</span>
+choices”, default <span class="mono">d=2</span>) and removes the smaller of their cached minima. Locks are taken
+with <span class="mono">tryLock</span> and a contended queue is just resampled, so a thread never blocks; the
+structure is <span class="kw">lock-based but behaves as wait-free in practice</span>, rather than truly
+lock-free. Quality is measured by <span class="kw">rank error</span>, the number of elements currently in the
+queue that are smaller than the one returned. My project asks what happens to that quality once the load stops
+being uniform.</p>
+
+<h2>2. Summary of the Papers</h2>
+
+<h3>2.1 Rihani, Sanders &amp; Dementiev — MultiQueues (SPAA 2015) [1]</h3>
+<p>This is the paper that introduces the MultiQueue. The idea is to take <span class="mono">c·p</span> ordinary
+sequential priority queues, guard each one with a lock, send every <span class="mono">insert</span> to a
+uniform-random queue, and do <span class="mono">deleteMin</span> by picking two queues at random and deleting from
+whichever has the smaller minimum. That last step is the “power of two choices” from randomized load balancing.
+The authors argue that this design is simple and hardware-independent, gives good throughput and good (empirical)
+quality, and scales much better than a single-lock queue. The other two papers both build on it.</p>
+
+<h3>2.2 Williams, Sanders &amp; Dementiev — Engineering MultiQueues (ESA 2021) [2]</h3>
+<p>This paper makes the MultiQueue fast and pins down what its quality actually means. It generalizes sampling to
+<span class="mono">d ≥ 2</span> choices, adds insertion and deletion buffers so the heap work is amortized, and
+defines the <span class="kw">rank error</span> and delay metrics, along with a simplified expected rank error of
+about <span class="mono">c·p/d − 1</span>. It also adds <em>stickiness</em>: a thread reuses the same queue (or set
+of queues) for several operations in a row to get better cache locality. The paper is careful to note this is a
+trade-off, and that stickiness actually <em>raises</em> rank error and delay.</p>
+
+<h3>2.3 Walzer &amp; Williams — A Simple yet Exact Analysis (ESA 2025) [3]</h3>
+<p>This paper works out the MultiQueue’s rank error exactly in the long run. For <span class="mono">d=2</span> it
+proves the expected value is <span class="mono">(5/6)·n − 1 + 1/(6n)</span> with <span class="mono">n=c·p</span>, and
+it sets up a more general <span class="mono">σ</span>-MultiQueue where the deletion rule can pick a queue with a
+probability that depends on its rank. The proof needs a few assumptions to hold: uniform-random insert placement,
+independent uniform sampling at <span class="mono">deleteMin</span>, a random initial partition, and a
+deletion-only steady state. The authors themselves point out that the method “is not directly applicable when
+insertions of arbitrary elements can happen after deletions.”</p>
+
+<h3>2.4 The common thread</h3>
+<p>So the three papers are really the same structure at three stages: the original design [1], the engineering
+work that adds quality metrics and heuristics like stickiness [2], and the exact analysis of the quality [3].
+What I care about is that all of the quality analysis assumes a uniformly random load. None of the three looks
+at what happens when the small elements pile up in a few queues, and that is the case my project looks at.</p>
+
+<h2>3. My Approach and Method</h2>
+<p>I wrote the MultiQueue and the whole test harness in <span class="kw">pure Java 8</span> (one directory, no
+packages, main class <span class="mono">MppRunner</span>, no JVM flags) so it builds and runs unchanged on the
+college server. Each internal queue is a <span class="mono">long</span>-based binary min-heap behind a
+<span class="mono">ReentrantLock</span>, with a <span class="mono">volatile</span> cached minimum and some manual
+padding to avoid false sharing. The strict baseline is just one such heap behind one lock. All the randomness
+comes from <span class="mono">ThreadLocalRandom</span>.</p>
+<p>Rank error is <span class="kw">ordinal</span>: it counts how many elements currently in the queue are smaller
+than the one I returned, no matter what the actual key values are. That means it depends on how the small elements
+are spread across the queues, which is what drove my choice of workloads. I use three.
+<span class="kw">UNIFORM</span> has i.i.d. keys and uniform placement, which is the regime the analysis assumes.
+<span class="kw">MONOTONE</span> is Dijkstra-like: each insert is just above the producer’s last deletion, so it
+stresses key <em>order</em> only while placement stays uniform. <span class="kw">SKEWED</span> routes the small
+keys to a small “hot” subset of queues, which models urgent work coming from a few sources. Quality is measured
+with a single-threaded driver, since the analyses are stated for sequential execution of the operations [3]. The
+driver runs the real MultiQueue and mirrors its contents in a Fenwick tree, so every
+<span class="mono">deleteMin</span>’s rank error is exact; I average over seven repetitions. To make sure the
+result is not just a sequential artefact, I also measure exact rank error with <span class="mono">p</span> threads
+issuing operations in interleaved order, applying each one under an audit monitor so the count stays exact while
+the per-thread memory and the shared queue still interact. Throughput is a separate experiment: all
+<span class="mono">p</span> threads on a 50/50 insert/<span class="mono">deleteMin</span> mix, with warmup,
+best-of-repeats, and a checksum so the JIT cannot delete the work as dead code.</p>
+<div class="env">
+<span class="kw">Run environment.</span> Every experiment prints its rows as CSV between
+<span class="mono">===CSV_BEGIN===</span> / <span class="mono">===CSV_END===</span>, and the figures below are
+generated from that CSV. The code is built with <span class="mono">javac --release 8</span> so it runs unchanged
+on the college server. The numbers here are the <b>average of three runs on the college server</b>
+(<span class="mono">java.version 17.0.15</span>, 96 hardware threads), which each run prints for the record. I
+average because the server is shared and its throughput jitters from run to run; the rank-error figures are
+measured exactly and barely move between runs, so averaging them changes nothing. The scalability experiment
+(§4.4) extends to as many hardware threads as the machine has, and on this 96-thread server it fills in the
+thread counts up to 64.
+</div>
+
+<h2>4. Suggestions — the three-part study</h2>
+<p>The project has the three parts I had approved: a <em>problem</em> the papers do not analyze, a
+<em>variation</em> of the sampling width, and an <em>improvement</em> to the sampling rule.</p>
+
+<h3>4.1 Part 1 (problem) — the guarantee breaks under non-uniform placement</h3>
+<p>I ran the exact sequential rank-error driver on all three workloads at <span class="mono">n = c·p = 8</span>,
+<span class="mono">d=2</span>, and compared the mean against the uniform-load prediction
+<span class="mono">(5/6)·8 = 6.67</span>.</p>
+<table>
+<tr><th class="l">Workload</th><th>mean</th><th>p99</th><th>max</th><th>vs theory 6.67</th></tr>
+<tr><td class="l">UNIFORM</td><td>5.62</td><td>47</td><td>157</td><td>0.84×</td></tr>
+<tr><td class="l">MONOTONE</td><td>2.25</td><td>66</td><td>404</td><td>0.34×</td></tr>
+<tr><td class="l">SKEWED</td><td><b>27.56</b></td><td>584</td><td>883</td><td><b>4.13×</b></td></tr>
+</table>
+<p class="note">Table 1. Rank error by workload (n=8, d=2). UNIFORM tracks the theory; SKEWED is far above it.</p>
+<figure><img src="../bench/figures/fig1_part1_weakness.png"><figcaption>Figure 1. UNIFORM validates the harness against the closed form; MONOTONE (key order alone) is harmless; SKEWED (non-uniform placement) blows the bound by ~4×.</figcaption></figure>
+<p>UNIFORM matches the closed form, which is really a check that my measurement is right. MONOTONE turns out to
+be harmless (2.2, even below theory): changing only the key values while keeping placement uniform does not hurt,
+because rank error is ordinal. The one that breaks the guarantee is SKEWED, i.e. non-uniform placement. In other
+words the MultiQueue depends on the placement assumption, not on key randomness by itself. This is the problem the
+papers do not analyze.</p>
+
+<h3>4.2 Part 2 (variation) — the d-parameter throughput↔quality trade-off</h3>
+<p>I swept <span class="mono">d ∈ {1,2,4,8}</span> at <span class="mono">p=8</span>, <span class="mono">n=16</span>,
+measuring both concurrent throughput and mean rank error on UNIFORM and SKEWED.</p>
+<table>
+<tr><th class="l">d</th><th>UNIFORM thr (M ops/s)</th><th>UNIFORM rank</th><th>SKEWED thr (M ops/s)</th><th>SKEWED rank</th></tr>
+<tr><td class="l">1</td><td>14.8</td><td>125.5</td><td>14.8</td><td>1756.5</td></tr>
+<tr><td class="l">2</td><td>13.1</td><td>11.8</td><td>13.0</td><td>35.6</td></tr>
+<tr><td class="l">4</td><td>11.2</td><td>4.1</td><td>11.4</td><td>4.2</td></tr>
+<tr><td class="l">8</td><td>9.2</td><td>1.6</td><td>9.3</td><td>1.7</td></tr>
+</table>
+<p class="note">Table 2. Throughput and mean rank error vs d (p=8, n=16). Rank error falls steeply; throughput declines.</p>
+<figure class="wide"><img src="../bench/figures/fig2_part2_dsweep.png"><figcaption>Figure 2. Left/right: UNIFORM/SKEWED. Quality (red, log scale) improves dramatically with d while throughput (blue) declines — a clear knee at d=2.</figcaption></figure>
+<p>At <span class="mono">d=1</span> there is no choice at all and quality is poor, and under skew it is
+catastrophic (rank 1756). The biggest single gain is the first extra choice at <span class="mono">d=2</span>
+(SKEWED 1756→36, about 49×). After that the returns diminish while throughput keeps dropping: on SKEWED, going
+from <span class="mono">d=2</span> to <span class="mono">d=8</span> improves rank from 36 to 1.7 but costs about 28%
+throughput. I take <span class="mono">d=2</span> as the sensible default; raising it only pays off when you have
+a tight correctness budget and can afford to lose some throughput. That is what leads into Part 3: can I get
+better quality at <span class="mono">d=2</span> without paying for extra samples?</p>
+
+<h3>4.3 Part 3 (improvement) — a hot-set-seeking thread-local bias</h3>
+<p>The idea I chose to start from was to bias <span class="mono">deleteMin</span> toward the queues a thread has gone
+longest without sampling. My advisor approved it and added a constraint: a <em>global</em> per-queue tracker would
+just re-create the bottleneck the MultiQueue is supposed to remove, so each thread should keep its own samples and
+check them locally, with at most occasional synchronization. I implemented that idea as <span class="kw">STALE</span>,
+found it weak once I measured it, and then investigated further and improved it into a stronger thread-local bias
+called <span class="kw">WINNER</span> under the same constraint. I compare the two head to head. STALE replaces one of the <span class="mono">d</span> samples with
+the queue that has gone longest without being sampled (a <span class="mono">syncPeriod</span> setting lets its
+signal be local, periodic, or fully global). WINNER instead replaces one sample with a queue drawn from a small
+thread-local ring of <em>recently winning</em> queues, and evicts a remembered queue as soon as it turns out to be
+contended or empty.</p>
+<table>
+<tr><th class="l">SKEWED, d=2 (mean rank, sequential exact)</th><th>UNIFORM</th><th>STALE</th><th>WINNER M=1</th><th>WINNER M=4</th><th>WINNER M=4, ε=⅛</th></tr>
+<tr><td class="l">mean</td><td>37.78</td><td>30.92</td><td><b>13.71</b></td><td>15.32</td><td>14.74</td></tr>
+<tr><td class="l">p99</td><td>615</td><td>563</td><td><b>80</b></td><td>91</td><td>91</td></tr>
+</table>
+<p class="note">Table 3. WINNER cuts both the mean and the tail far more than STALE. (UNIFORM at d=3 / d=4 gives 6.4 / 4.2 — see text.) Parts 2–3 use <span class="mono">n=16</span> (<span class="mono">p=8</span>, hot set <span class="mono">max(1,n/8)=2</span>), so the SKEWED baseline here (37.8) is larger than Part 1’s <span class="mono">n=8</span> single-hot-queue value (27.6).</p>
+<figure class="wide"><img src="../bench/figures/fig3_part3_quality.png"><figcaption>Figure 3. Left: on SKEWED, STALE helps only weakly (38→31, ~18%) while WINNER roughly thirds the rank error (→14), about ¾ of the way to a full extra uniform probe (d=3 dotted line) at no extra sampling cost. Right: the win is not a single-threaded artefact — with P=8 threads issuing operations in interleaved order against the shared queue (each op applied under an audit monitor so the rank count stays exact) WINNER still roughly halves the exact rank error.</figcaption></figure>
+<p>STALE only helps a little, and the reason is not hard to see: the least-recently-sampled queue has nothing to do
+with where the small elements are, so biasing toward it does not make a sample any more likely to land on the hot
+set. Its gain (38→31, about 18%) is real but small. WINNER goes at the failure mode directly. Under skew the hot
+queues keep getting refilled with small keys, so a queue that just won is likely to win again; remembering it
+raises the chance the biased probe hits the hot set, which is only <span class="mono">max(1,n/8)</span> queues (2
+of 16 here). That gives about a 61–64% reduction in the mean (37.8→14.7 for the <span class="mono">M=4, ε=⅛</span>
+ring, and 13.7 for a single slot) and about an 8× smaller tail (p99 615→80), which is several times better than
+STALE. The gain also survives interleaved <span class="mono">p=8</span> execution (Fig. 3 right, 29.2→14.3). I also
+ran two sanity checks. Raising <span class="mono">d</span> to 3 beats WINNER on pure quality
+(6.4 vs 13.7), but it samples an extra queue on every operation, whereas WINNER gets about ¾ of that gain for free
+at <span class="mono">d=2</span>. And on UNIFORM load WINNER makes no difference, because there is no persistent
+hot queue to remember.</p>
+<p><span class="kw">What is mine, and what is borrowed.</span> The mechanism WINNER uses (remember a good choice and
+reuse it as one of the <span class="mono">d</span> candidates) is the <em>power of two choices with memory</em>
+[4]. That is an outside reference I cite for motivation, not one of the three MultiQueue papers I summarize. In
+[4] it is used for <em>insertion</em> load-balancing; moving it over to the <em>deletion</em> side as a
+content-aware quality bias is not in any of the three papers, and that is my contribution. WINNER is not a new
+primitive. It also should not be confused with the MultiQueue’s own <em>stickiness</em> [2], which reuses a random
+queue set for a fixed period to get cache locality and is documented to <em>raise</em> rank error. WINNER is
+almost the reverse of that. Its memory is keyed on which queue just won rather than on a fixed period, its whole
+point is to lower rank error under skew instead of trading quality for locality, and it still samples fresh
+uniform queues next to the one remembered winner so it never locks onto a single queue. And since a hint is only
+ever re-checked under the lock, no heuristic can affect correctness; a dedicated gate confirms WINNER preserves
+the multiset exactly.</p>
+<figure class="wide"><img src="../bench/figures/fig4_part3_tradeoff.png"><figcaption>Figure 4. Left: WINNER’s forced-exploration “dial” (the advisor’s “compare the options”) is nearly flat — the ring plus evict-on-contention already prevent herding, so exploration is mild insurance (note the zoomed axes). Right: concurrent throughput with each strategy’s <span class="mono">deleteMin</span> lock-fail rate; WINNER is no slower and no more contended than uniform, while making the staleness signal fully global (STALE sync/op) collapses throughput 4×.</figcaption></figure>
+<p><span class="kw">Does it herd, and is the local design justified?</span> The obvious worry about WINNER is that if
+every thread converges on the same few hot queues, they will all contend for those locks. The measurements do not
+show this. Run concurrently on SKEWED (<span class="mono">p=8</span>), WINNER’s throughput (about 14 M ops/s) is in
+the same range as uniform (13.6 M) and STALE (13.9 M), and its <span class="mono">tryLock</span>-fail rate is
+actually a bit lower (about 22% vs 27%), because a contended remembered queue gets evicted right away. The
+sharpest contrast is with a <em>shared</em> tracker: forcing the STALE signal to reconcile on every operation
+drops throughput from 14.2 to 3.6 M ops/s, about 4× (Fig. 4 right). The shared array turns into the very
+bottleneck the MultiQueue was built to avoid, whereas reconciling only every 64 operations keeps full throughput.
+So the rule I ended up following is to keep any sampling heuristic strictly thread-local; WINNER works well
+because it shares nothing.</p>
+
+<h3>4.4 Scalability — why the relaxation is worth it</h3>
+<p>I measured throughput against thread count for the strict single-lock queue and for the MultiQueue. This is
+the experiment that extends to all available cores, so a bigger machine fills in the higher thread counts.</p>
+<figure><img src="../bench/figures/fig5_scalability.png"><figcaption>Figure 5. StrictPQ (single lock) does not scale past one thread; MultiQueue rises to 54.1M ops/s at 64 threads.</figcaption></figure>
+<p>The strict single-lock queue peaks at one thread (22.3M ops/s) and then flattens out under contention (about
+13M ops/s from 4 to 64 threads). The MultiQueue pays a small penalty at one thread (15.4M) but scales the other
+way: it overtakes the strict queue by 8 threads and climbs to 54.1M ops/s at 64 threads, roughly 4× the strict
+queue at that point. This is the scalability the relaxation buys; Parts 1–3 are about the quality price that comes
+with it and how to manage that price.</p>
+
+<h2>5. Conclusion</h2>
+<p>The MultiQueue’s <span class="mono">(5/6)·n</span> rank-error guarantee is real, but it is conditional on a
+uniform load. It holds under uniform placement, it is unaffected by key order on its own, and it breaks by about
+4× once the placement is realistically skewed. The <span class="mono">d</span> parameter trades throughput for
+quality, with a knee at <span class="mono">d=2</span>. For the improvement, the “revisit neglected
+queues” idea I started from helps only a little, because it is blind to where the content actually is. My
+<span class="kw">remember-the-winner</span> bias (the power of two choices with memory, kept strictly
+thread-local) instead seeks out the hot set: it cuts skewed rank error by about 61% with a roughly 7× smaller
+tail, holds up under <span class="mono">p=8</span> interleaved operation, and does not herd, while a shared tracker
+destroys throughput by 4×. The way I read this is that in a relaxed concurrent data structure the cost of
+coordinating an improvement can end up larger than the improvement itself, which is why a purely thread-local
+version won here. In the terms of [3]’s rank-biased selection framework, WINNER is a thread-local,
+workload-adaptive bias defined by recency rather than a strict rank function, which is a small step into the
+workload-adaptive sampling that the analysis leaves open.</p>
+
+<h2>References</h2>
+<ol class="refs">
+<li>H. Rihani, P. Sanders, R. Dementiev. <em>MultiQueues: Simple Relaxed Concurrent Priority Queues.</em> SPAA 2015, pp. 80–82. Preprint: arXiv:1411.1209.</li>
+<li>M. Williams, P. Sanders, R. Dementiev. <em>Engineering MultiQueues: Fast Relaxed Concurrent Priority Queues.</em> ESA 2021, LIPIcs 204, 81:1–81:17. doi:10.4230/LIPIcs.ESA.2021.81. Extended preprint: arXiv:2504.11652.</li>
+<li>S. Walzer, M. Williams. <em>A Simple yet Exact Analysis of the MultiQueue.</em> ESA 2025, LIPIcs. doi:10.4230/LIPIcs.ESA.2025.85. Preprint: arXiv:2410.08714.</li>
+<li>M. Mitzenmacher, B. Prabhakar, D. Shah. <em>Load Balancing with Memory.</em> IEEE FOCS 2002, pp. 799–808. (The “power of two choices with memory”; used here as motivation, not as a bound — a deletion priority queue is not the static balls-into-bins setting it analyses.)</li>
+<li>V. Gramoli. <em>More Than You Ever Wanted to Know about Synchronization (Synchrobench).</em> PPoPP 2015 — benchmarking methodology for concurrent data structures.</li>
+</ol>
+
+</body>
+</html>

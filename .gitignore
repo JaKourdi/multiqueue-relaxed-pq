@@ -1,0 +1,17 @@
+# Build output — but keep the committed server-upload set under artifacts/
+out/
+*.class
+!artifacts/server_upload/*.class
+
+# Transient local run output at the repo root (the curated copies live in artifacts/)
+/mpp.out
+/mpp.err
+/smoke.out
+/smoke.err
+*.tmp
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

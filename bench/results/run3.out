@@ -1,0 +1,75 @@
+=== MPP RUN START: MultiQueue (relaxed concurrent priority queue) ===
+java.version = 17.0.15, availableProcessors = 96
+durationMs = 1500, repeats = 3
+--- correctness ---
+Gate 1 (numQueues=1 exact ordering): PASS
+Gate 2 (concurrent multiset preservation): PASS
+Gate 3 (WINNER multiset preservation): PASS
+===CSV_BEGIN===
+experiment,strategy,workload,d,c,threads,syncPeriod,ringSize,throughput_ops,lockFailPct,rank_mean,rank_p99,rank_max,rank_count
+--- part1: rank error vs theory (5/6*numQueues = 6.67), numQueues=8 ---
+part1,UNIFORM,UNIFORM,2,2,4,never,0,0,0.000,5.59,46,149,150111
+part1,UNIFORM,MONOTONE,2,2,4,never,0,0,0.000,2.22,65,396,149829
+part1,UNIFORM,SKEWED,2,2,4,never,0,0,0.000,27.95,583,901,149981
+--- part2: d-sweep (throughput vs quality), P=8 ---
+part2,UNIFORM,UNIFORM,1,2,8,never,0,15887232,24.714,122.60,1965,4432,149907
+part2,UNIFORM,UNIFORM,2,2,8,never,0,13387989,26.417,11.81,84,231,150058
+part2,UNIFORM,UNIFORM,4,2,8,never,0,11107584,34.011,4.13,24,77,150092
+part2,UNIFORM,UNIFORM,8,2,8,never,0,8954666,54.181,1.64,10,31,149980
+part2,UNIFORM,SKEWED,1,2,8,never,0,14888832,23.797,1719.58,8902,10667,148152
+part2,UNIFORM,SKEWED,2,2,8,never,0,12746197,26.411,34.60,554,895,149828
+part2,UNIFORM,SKEWED,4,2,8,never,0,11578965,36.245,4.20,24,81,150067
+part2,UNIFORM,SKEWED,8,2,8,never,0,9336320,50.508,1.65,10,33,150008
+--- part3: thread-local sampling biases (STALE vs WINNER), P=8 ---
+part3q,UNIFORM,UNIFORM,2,2,8,never,0,0,0.000,11.91,85,258,149921
+part3q,STALE,UNIFORM,2,2,8,never,0,0,0.000,8.56,65,190,149871
+part3q,WINNER,UNIFORM,2,2,8,never,1,0,0.000,13.74,80,230,150081
+part3q,WINNER,UNIFORM,2,2,8,never,4,0,0.000,15.16,90,274,149989
+part3q,WINNER,UNIFORM,2,2,8,8,4,0,0.000,14.45,89,267,149943
+part3q,UNIFORM,MONOTONE,2,2,8,never,0,0,0.000,4.80,122,647,150091
+part3q,STALE,MONOTONE,2,2,8,never,0,0,0.000,4.31,114,634,149998
+part3q,WINNER,MONOTONE,2,2,8,never,1,0,0.000,0.81,20,532,149951
+part3q,WINNER,MONOTONE,2,2,8,never,4,0,0.000,1.19,36,547,150092
+part3q,WINNER,MONOTONE,2,2,8,8,4,0,0.000,1.68,52,577,149781
+part3q,UNIFORM,SKEWED,2,2,8,never,0,0,0.000,40.21,669,920,150109
+part3q,STALE,SKEWED,2,2,8,never,0,0,0.000,30.55,561,823,149809
+part3q,WINNER,SKEWED,2,2,8,never,1,0,0.000,13.72,80,223,150164
+part3q,WINNER,SKEWED,2,2,8,never,4,0,0.000,15.32,91,273,150033
+part3q,WINNER,SKEWED,2,2,8,8,4,0,0.000,14.75,91,249,149962
+part3q,UNIFORM,SKEWED,3,2,8,never,0,0,0.000,6.39,39,122,150142
+part3q,UNIFORM,SKEWED,4,2,8,never,0,0,0.000,4.21,24,76,149938
+--- part3eps: WINNER exploration dial on SKEWED ---
+part3eps,WINNER,SKEWED,2,2,8,never,4,13885013,21.913,15.33,91,257,149793
+part3eps,WINNER,SKEWED,2,2,8,16,4,15056085,21.839,14.97,90,240,150050
+part3eps,WINNER,SKEWED,2,2,8,8,4,13625770,22.389,14.74,91,255,149964
+part3eps,WINNER,SKEWED,2,2,8,4,4,14335829,22.870,14.44,96,254,149924
+--- part3thr: concurrent throughput + lock-fail rate per strategy ---
+part3thr,UNIFORM,SKEWED,2,2,8,never,0,13380138,26.774,0.00,0,0,0
+part3thr,STALE,SKEWED,2,2,8,never,0,13750357,24.727,0.00,0,0,0
+part3thr,WINNER,SKEWED,2,2,8,never,4,14570112,22.065,0.00,0,0,0
+part3thr,WINNER,SKEWED,2,2,8,8,4,14330794,22.471,0.00,0,0,0
+--- part3sync: cost of sharing the STALE signal ---
+part3sync,STALE,SKEWED,2,2,8,never,0,14392661,24.568,0.00,0,0,0
+part3sync,STALE,SKEWED,2,2,8,64,0,14485034,24.236,0.00,0,0,0
+part3sync,STALE,SKEWED,2,2,8,1,0,3524010,9.331,0.00,0,0,0
+--- part3cq: concurrent interleaved exact rank error ---
+part3cq,UNIFORM,SKEWED,2,2,8,never,0,0,0.000,28.58,370,595,100021
+part3cq,STALE,SKEWED,2,2,8,never,0,0,0.000,25.89,357,544,100121
+part3cq,WINNER,SKEWED,2,2,8,8,4,0,0.000,14.35,86,211,100001
+--- scale: StrictPQ vs MultiQueue throughput vs threads ---
+scale,StrictPQ,UNIFORM,0,0,1,0,0,23341141,0.000,0.00,0,0,0
+scale,MultiQueue,UNIFORM,2,2,1,never,0,15228842,0.000,0.00,0,0,0
+scale,StrictPQ,UNIFORM,0,0,2,0,0,11657301,0.000,0.00,0,0,0
+scale,MultiQueue,UNIFORM,2,2,2,never,0,7764736,16.160,0.00,0,0,0
+scale,StrictPQ,UNIFORM,0,0,4,0,0,14278229,0.000,0.00,0,0,0
+scale,MultiQueue,UNIFORM,2,2,4,never,0,10020266,23.522,0.00,0,0,0
+scale,StrictPQ,UNIFORM,0,0,8,0,0,13823573,0.000,0.00,0,0,0
+scale,MultiQueue,UNIFORM,2,2,8,never,0,14608085,26.807,0.00,0,0,0
+scale,StrictPQ,UNIFORM,0,0,16,0,0,13585834,0.000,0.00,0,0,0
+scale,MultiQueue,UNIFORM,2,2,16,never,0,26815829,28.043,0.00,0,0,0
+scale,StrictPQ,UNIFORM,0,0,32,0,0,13783381,0.000,0.00,0,0,0
+scale,MultiQueue,UNIFORM,2,2,32,never,0,56831658,28.415,0.00,0,0,0
+scale,StrictPQ,UNIFORM,0,0,64,0,0,13307818,0.000,0.00,0,0,0
+scale,MultiQueue,UNIFORM,2,2,64,never,0,56586880,26.329,0.00,0,0,0
+===CSV_END===
+=== MPP RUN COMPLETE ===
