@@ -46,15 +46,16 @@ It keeps <span class="mono">c·p</span> internal queues, inserts into a random o
 <span class="mono">deleteMin</span> return the smaller minimum of only <span class="mono">d</span> randomly
 sampled queues. Its quality guarantee, an expected <span class="kw">rank error</span> of
 <span class="mono">(5/6)·n − 1 + 1/(6n)</span> at <span class="mono">d=2</span>, assumes the load is uniformly
-random. I summarize the three papers that build this structure and then carry out the three-part project I had
-approved. (1) <em>Problem</em>: under a non-uniform placement workload the measured rank error is about 4× the
+random. I summarize the three papers that build this structure and then study it in three parts. (1)
+<em>Problem</em>: under a non-uniform placement workload the measured rank error is about 4× the
 bound (27.6 vs 6.67 at <span class="mono">n=8</span>). (2) <em>Variation</em>: sweeping <span class="mono">d</span>
 makes rank error fall sharply (from 1756 at <span class="mono">d=1</span> to 1.7 at <span class="mono">d=8</span>),
 while throughput drops about 28% over the useful <span class="mono">d=2–8</span> range. (3) <em>Improvement</em>:
 the idea I chose to start from (bias toward the least-recently-sampled queue) helps only about 18%, so after
 investigating I improved it into <span class="kw">remember-the-winner</span>, a thread-local bias toward recently winning queues that cuts SKEWED
 rank error by about 60% with no shared writes and no herding. Every number here comes from real runs of my
-Java 8 code, with sequential rank error measured exactly so it matches the setting the analyses use.</p>
+Java 8 code on the college's 96-core server, with sequential rank error measured exactly so it matches the
+setting the analyses use.</p>
 </div>
 
 <h2>1. Introduction — the shared problem</h2>
@@ -142,7 +143,7 @@ thread counts up to 64.
 </div>
 
 <h2>4. Suggestions — the three-part study</h2>
-<p>The project has the three parts I had approved: a <em>problem</em> the papers do not analyze, a
+<p>The study has three parts: a <em>problem</em> the papers do not analyze, a
 <em>variation</em> of the sampling width, and an <em>improvement</em> to the sampling rule.</p>
 
 <h3>4.1 Part 1 (problem) — the guarantee breaks under non-uniform placement</h3>

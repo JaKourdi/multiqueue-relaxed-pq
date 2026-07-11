@@ -1,10 +1,10 @@
 # MultiQueue: a relaxed concurrent priority queue, where its rank-error guarantee breaks, and a thread-local fix
 
-This is my Multicore Programming final project. I implement the **MultiQueue**, a relaxed concurrent priority queue, in pure Java 8 and study it under non-uniform load. It builds on three papers. Rihani, Sanders & Dementiev (SPAA 2015) [1] introduce the structure: `c·p` internal sequential heaps, each behind its own lock, with `insert` going to a uniform-random queue and `deleteMin` sampling `d` queues and popping the smaller of their cached minima. Williams, Sanders & Dementiev (ESA 2021) [2] engineer it and define the **rank error** quality metric. Walzer & Williams (ESA 2025) [3] prove the expected rank error is exactly `(5/6)·n − 1 + 1/(6n)` at `d=2` with `n = c·p`. That guarantee assumes a uniformly random load. My project asks what happens when the load is not uniform, and what I can do about it.
+I implement the **MultiQueue**, a relaxed concurrent priority queue, in pure Java 8 and study it under non-uniform load. It builds on three papers. Rihani, Sanders & Dementiev (SPAA 2015) [1] introduce the structure: `c·p` internal sequential heaps, each behind its own lock, with `insert` going to a uniform-random queue and `deleteMin` sampling `d` queues and popping the smaller of their cached minima. Williams, Sanders & Dementiev (ESA 2021) [2] engineer it and define the **rank error** quality metric. Walzer & Williams (ESA 2025) [3] prove the expected rank error is exactly `(5/6)·n − 1 + 1/(6n)` at `d=2` with `n = c·p`. That guarantee assumes a uniformly random load. My project asks what happens when the load is not uniform, and what I can do about it.
 
 ## The three-part project in brief
 
-The project has three parts I had approved: a *problem* the papers do not analyze, a *variation* of the sampling width, and an *improvement* to the sampling rule.
+The project has three parts: a *problem* the papers do not analyze, a *variation* of the sampling width, and an *improvement* to the sampling rule. All numbers come from real runs of the Java 8 code on the college's 96-core server.
 
 1. **Problem: skew breaks the bound (~4×).** Under a non-uniform *placement* workload (small keys routed to a few "hot" queues), the measured mean rank error is about 4× the uniform-load prediction: **27.56 vs 6.67** at `n=8`, `d=2` (4.13×). Changing only key *order* while keeping placement uniform (a Dijkstra-like MONOTONE workload) is harmless (2.25). Rank error is ordinal, so what the guarantee depends on is non-uniform placement, not key randomness.
 2. **Variation: the `d` sweep trade-off.** Widening the sample from `d=1` to `d=8` makes rank error fall steeply (on SKEWED, from **1756.5 to 1.7**) while throughput declines about **28%** over the useful `d=2–8` range. The biggest single gain is the first extra choice at `d=2` (SKEWED 1756→36, ~49×), so `d=2` is the sensible default. That raises the Part 3 question: can I get better quality at `d=2` without paying for extra samples?
@@ -25,7 +25,7 @@ multiqueue-relaxed-pq/
     StrictPQ.java             baseline: one SeqHeap behind one lock (exact, non-scalable)
     Workloads.java            UNIFORM / MONOTONE / SKEWED key-and-placement models
   report/
-    report.pdf               the submitted report
+    report.pdf               the report (PDF)
     report.html              same report, source form (all numbers inline)
   bench/
     SERVER_RUN.md            how it runs on the college server (authoritative environment)
@@ -55,7 +55,7 @@ java -cp out MppRunner
 java -cp out MppRunner 300 1
 ```
 
-This needs a real JDK on the path (a stub `java` shim will not run it). The **college server is the authoritative environment** for the course. See [`bench/SERVER_RUN.md`](bench/SERVER_RUN.md) for the exact upload/run recipe there, and [`artifacts/server_upload/`](artifacts/server_upload/) for the compiled Java 8 class set that gets uploaded. The committed figures are the **average of three runs on the college server** (`java.version 17.0.15`, 96 hardware threads).
+This needs a real JDK on the path (a stub `java` shim will not run it). The **college server is the authoritative environment** for these results. See [`bench/SERVER_RUN.md`](bench/SERVER_RUN.md) for the exact upload/run recipe there, and [`artifacts/server_upload/`](artifacts/server_upload/) for the compiled Java 8 class set that gets uploaded. The committed figures are the **average of three runs on the college server** (`java.version 17.0.15`, 96 hardware threads).
 
 To reproduce the figures from the raw server captures:
 
