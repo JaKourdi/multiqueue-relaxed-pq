@@ -55,7 +55,7 @@ java -cp out MppRunner
 java -cp out MppRunner 300 1
 ```
 
-This needs a real JDK on the path (a stub `java` shim will not run it). The **college server is the authoritative environment** for these results. See [`bench/SERVER_RUN.md`](bench/SERVER_RUN.md) for the exact upload/run recipe there, and [`artifacts/server_upload/`](artifacts/server_upload/) for the compiled Java 8 class set that gets uploaded. The committed figures are the **average of three runs on the college server** (`Java 8`, 96 hardware threads).
+This needs a real JDK on the path (a stub `java` shim will not run it). The **college server is the authoritative environment** for these results. See [`bench/SERVER_RUN.md`](bench/SERVER_RUN.md) for the exact upload/run recipe there, and [`artifacts/server_upload/`](artifacts/server_upload/) for the compiled Java 8 class set that gets uploaded. The committed figures are the **average of three runs on the college's 96-core server** (Java-8 bytecode via `--release 8`, run on the server's Java 17 JVM; 96 hardware threads).
 
 To reproduce the figures from the raw server captures:
 

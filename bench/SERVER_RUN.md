@@ -50,7 +50,7 @@ If you have an interactive shell instead of a drop-folder, compile and run direc
 
 ```bash
 # only if you can also upload the .java sources; otherwise use the .class set above
-javac --release 8 *.java          # must be --release 8 (server is Java 8)
+javac --release 8 *.java          # must be --release 8: targets Java-8 bytecode, runs on the server's newer JVM
 java MppRunner > mpp.out 2>&1      # banners on stderr, CSV on stdout, both captured
 ```
 
@@ -82,11 +82,13 @@ Gate 2 (concurrent multiset preservation): PASS
 Gate 3 (WINNER multiset preservation): PASS
 ```
 
-> A note on the environment. HW3's runs of this same `MppRunner` harness reported
-> `Java 8, availableProcessors = 96` on the college server. `--release 8`
-> bytecode runs unchanged there, but **96 cores ≠ the 16-core box the committed numbers
-> came from**, so the fresh throughput and rank figures will differ. That's fine.
-> §3 covers regenerating the report from whatever the server actually produces.
+> A note on the environment. The committed numbers come from three runs of this
+> `MppRunner` harness on the college's **96-core server**, whose JVM reports
+> `java.version = 17.0.15, availableProcessors = 96` (each run prints this for the
+> record). `--release 8` compiles to Java-8 bytecode that runs unchanged on that
+> newer JVM. Because the server is shared and loads up near deadlines, throughput
+> jitters between runs, so §3 averages 2–3 runs; the rank-error figures are exact
+> and barely move. §3 covers regenerating the report from whatever the server produces.
 
 ---
 
